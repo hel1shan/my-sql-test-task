@@ -43,15 +43,16 @@
 # т.е. при поиске по полному ФИО в таблице(регистраций карт-пропусков) записи могут не найтись, хотя события того же человека сохранены под сокращённым именем.
 #
 # В целом это не мешает получить все регистрации из таблицы за сутки.
-# SELECT
-#     s.username,
-#     s.eventdatetime
-# FROM stat AS s
-# WHERE s.eventdatetime >= $1
-#   AND s.eventdatetime <  $1 + INTERVAL '1 day'
-# ORDER BY - будет дорого если индекс останется по eventdatetime, можем индекс по eventdatetime и добавить составной индекс (eventdatetime, eventid) только нужно ли это?
-#     s.eventdatetime,
-#     s.eventid;
+  
+SELECT
+    s.username,
+    s.eventdatetime
+FROM stat AS s
+WHERE s.eventdatetime >= $1
+  AND s.eventdatetime <  $1 + INTERVAL '1 day'
+ORDER BY - будет дорого если индекс останется по eventdatetime, можем индекс по eventdatetime и добавить составной индекс (eventdatetime, eventid) только нужно ли это?
+    s.eventdatetime,
+    s.eventid;
 
 # второй запрос
 # одним запросом T-SQL выбрать все опоздания (имя пользователя, время прихода)
@@ -78,35 +79,37 @@
 #
 # Сложно полагаться на достоверность данных в текущей таблицы, если мы даже не можем гарантировано сказать, что все сотрудники проходят регистрацию.
 # Выходит сотрудник может просто прийти в офис и уйти из офиса не пройдя регистрацию? если верить условию задачи - Сотрудник может не зарегистрироваться на входе или выходе.
-# WITH first_events AS (
-#     SELECT
-#         s.username,
-#         MIN(s.eventdatetime) AS arrival_time
-#     FROM stat AS s
-#     WHERE s.eventdatetime >= $1::date
-#       AND s.eventdatetime <  $1::date + INTERVAL '1 day'
-#     GROUP BY s.username
-# ),
-# employees AS (
-#     SELECT u.username
-#     FROM users AS u
-# 
-#     UNION
-#
-#     SELECT f.username
-#     FROM first_events AS f
-# )
-# SELECT
-#     e.username,
-#     f.arrival_time
-# FROM employees AS e
-# LEFT JOIN first_events AS f
-#     ON f.username = e.username
-# WHERE f.arrival_time IS NULL
-#    OR f.arrival_time > $1::date + TIME '09:40:00'
-# ORDER BY
-#     e.username;
-#
+  
+WITH first_events AS (
+    SELECT
+        s.username,
+        MIN(s.eventdatetime) AS arrival_time
+    FROM stat AS s
+    WHERE s.eventdatetime >= $1::date
+      AND s.eventdatetime <  $1::date + INTERVAL '1 day'
+    GROUP BY s.username
+),
+employees AS (
+    SELECT u.username
+    FROM users AS u
+
+    UNION
+
+     SELECT f.username
+     FROM first_events AS f
+)
+SELECT
+    e.username,
+    f.arrival_time
+FROM employees AS e
+LEFT JOIN first_events AS f
+    ON f.username = e.username
+WHERE f.arrival_time IS NULL
+   OR f.arrival_time > $1::date + TIME '09:40:00'
+ORDER BY
+    e.username;
+
+
 # Третий запрос.
 # Как понять в каких дни работают сотрудники? Какой у них график?5/2? Субботу и воскресение учитываем или нет?
 # Может взять дефолтный график 5/2 и считать только будни.
